@@ -1,0 +1,37 @@
+import { test, expect } from '@playwright/test';
+test('budget, transactions, persistence, month isolation and deletion', async ({page}) => {
+ await page.goto('/');
+ await page.getByLabel('Budget mensile in euro').fill('500');
+ await page.getByRole('button',{name:'Imposta'}).click();
+ await page.getByLabel('Descrizione').fill('Supermercato');
+ await page.getByLabel('Importo (€)').fill('42.50');
+ await page.getByLabel('Categoria',{exact:true}).selectOption('Spesa');
+ await page.getByRole('button',{name:'+ Aggiungi movimento'}).click();
+ await expect(page.locator('.progress-label b')).toHaveText('457,50 €');
+ await expect(page.locator('.category-row')).toContainText('42,50');
+ await page.getByLabel('Entrata',{exact:true}).check();
+ await page.getByLabel('Descrizione').fill('Stipendio');
+ await page.getByLabel('Importo (€)').fill('1500');
+ await page.getByRole('button',{name:'+ Aggiungi movimento'}).click();
+ await expect(page.locator('.balance>strong')).toHaveText('1.457,50 €');
+ await page.reload();
+ await expect(page.locator('.transactions li')).toHaveCount(2);
+ const currentMonth = await page.getByLabel('Mese',{exact:true}).inputValue();
+ await page.getByLabel('Mese',{exact:true}).fill('2020-01');
+ await expect(page.locator('.transactions li')).toHaveCount(0);
+ await page.getByLabel('Mese',{exact:true}).fill(currentMonth);
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'Elimina Supermercato'}).click();
+ await expect(page.locator('.balance>strong')).toHaveText('1.500,00 €');
+ await page.reload();
+ await expect(page.locator('.transactions li')).toHaveCount(1);
+});
+test('mobile layout and safe description rendering',async ({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ await page.getByLabel('Descrizione').fill('<img src=x onerror=alert(1)>');
+ await page.getByLabel('Importo (€)').fill('10');
+ await page.getByRole('button',{name:'+ Aggiungi movimento'}).click();
+ await expect(page.locator('.transaction-description b')).toHaveText('<img src=x onerror=alert(1)>');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
